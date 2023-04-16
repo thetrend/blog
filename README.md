@@ -322,4 +322,207 @@ export { handler };
   "email": "some@email.com"
 }
 ```
-36.  
+36.  touch `netlify/functions/create-post.ts`
+37.  netlify/functions/create-post.ts:
+```
+import { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import faunadb from 'faunadb';
+
+const q = faunadb.query;
+
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+  let payload = JSON.parse(event.body!);
+  let authorization: any = event.headers.authorization?.split(' ');
+  const token = authorization[1];
+
+  const client = new faunadb.Client({
+    secret: token
+  });
+
+  try {
+    const response = await client.query(
+      q.Create(
+        q.Collection('posts'), {
+          data: {
+            title: payload.title,
+            content: payload.content,
+            userRef: q.Ref(
+              q.Collection('users'),
+              payload.user_id
+            )
+          }
+        }
+      )
+    )
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: JSON.stringify(response)
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 400,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: JSON.stringify({ error })
+    };
+  }
+};
+
+export { handler };
+```
+38.  `touch netlify/functions/read-posts.ts`
+39.  netlify/functions/read-posts.ts
+```
+import { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import faunadb from 'faunadb';
+
+const q = faunadb.query;
+const client = new faunadb.Client({
+  secret: process.env.FAUNADB_SERVER_SECRET!
+});
+
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+
+  try {
+    const response = await client.query(
+        q.Map(
+          q.Paginate(
+            q.Documents(
+              q.Collection('posts')
+            ),
+            { size: 100 }
+          ),
+          q.Lambda('ref', q.Get(q.Var('ref')))
+        )
+    );
+    return {
+      statusCode: 200,
+      body: JSON.stringify(response)
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 400,
+      body: JSON.stringify({ error })
+    };
+  }
+};
+
+export { handler };
+```
+40.  `touch netlify/functions/update-post.ts`
+41.  netlify/functions/update-post.ts
+```
+import { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import faunadb from 'faunadb';
+
+const q = faunadb.query;
+
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+  let payload = JSON.parse(event.body!);
+  let authorization: any = event.headers.authorization?.split(' ');
+  const token = authorization[1];
+  const postId = payload.post_id;
+  const data = payload.data;
+
+  const client = new faunadb.Client({
+    secret: token
+  });
+
+  try {
+    const response = await client.query(
+      q.Replace(
+        q.Ref(
+          q.Collection('posts'),
+          postId
+        ),
+        {
+          data
+        }
+      )
+    )
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'PUT, OPTIONS'
+      },
+      body: JSON.stringify(response)
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 400,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'PUT, OPTIONS'
+      },
+      body: JSON.stringify({ error })
+    };
+  }
+};
+
+export { handler };
+```
+42.  `touch netlify/functions/delete-post.ts`
+43.  netlify/functions/delete-post.ts
+```
+import { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import faunadb from 'faunadb';
+
+const q = faunadb.query;
+
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+  let payload = JSON.parse(event.body!);
+  let authorization: any = event.headers.authorization?.split(' ');
+  const token = authorization[1];
+  const postId = payload.post_id;
+
+  const client = new faunadb.Client({
+    secret: token
+  });
+
+  try {
+    const response = await client.query(
+      q.Delete(
+        q.Ref(
+          q.Collection('posts'),
+          postId
+        )
+      )
+    )
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'DELETE, OPTIONS'
+      },
+      body: JSON.stringify(response)
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 400,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': '*',
+        'Access-Control-Allow-Methods': 'DELETE, OPTIONS'
+      },
+      body: JSON.stringify({ error })
+    };
+  }
+};
+
+export { handler };
+```
