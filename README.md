@@ -195,4 +195,131 @@ const handler: Handler = async (event: HandlerEvent, context: HandlerContext) =>
 
 export { handler };
 ```
-29.  
+29.  `touch netlify/functions/signup.ts`
+30.  netlify/functions/signup.ts:
+```
+import { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import faunadb from 'faunadb';
+
+const q = faunadb.query;
+const client = new faunadb.Client({
+  secret: process.env.FAUNADB_ADMIN_SECRET!
+});
+
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+/*
+TODO: error states if the event body is empty
+ */
+  let payload = JSON.parse(event.body!);
+  let userData = payload.userData;
+  let password = payload.password;
+
+  try {
+    const user: any = await client.query(
+      q.Create(
+        q.Collection('users'), {
+        credentials: {
+          password,
+        },
+        data: userData
+      }
+      )
+    );
+
+    const response = user.data;
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: JSON.stringify(response)
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: JSON.stringify({ error })
+    }
+  }
+};
+
+export { handler };
+```
+31.  Test http://localhost:8888/api/signup via Postman or Insomnia using the following JSON data in POST mode:
+```
+{
+	"password": "abc123",
+	"userData": {
+		"name": "User Test",
+		"email": "some@email.com"
+	}
+}
+```
+32.  Check that the Fauna users collection has a new row
+33.  `touch netlify/functions/login.ts`
+34.  netlify/functions/login.ts:
+```
+import { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
+import faunadb from 'faunadb';
+
+const q = faunadb.query;
+const client = new faunadb.Client({
+  secret: process.env.FAUNADB_ADMIN_SECRET!
+});
+
+const handler: Handler = async (event: HandlerEvent, context: HandlerContext) => {
+  /*
+  TODO: error states if the event body is empty
+   */
+  let payload = JSON.parse(event.body!);
+  const email = payload.email;
+  const password = payload.password;
+
+  try {
+    const response = await client.query(
+      q.Login(
+        q.Match(
+          q.Index('users_by_email'),
+          email
+        ),
+        {
+          password
+        }
+      )
+    );
+    return {
+      statusCode: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: JSON.stringify(response)
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      },
+      body: JSON.stringify({ error })
+    };
+  }
+};
+
+export { handler };
+```
+35.  Test http://localhost:8888/api/login via Postman or Insomnia using the following JSON data in POST mode:
+```
+{
+	"password": "abc123",
+  "email": "some@email.com"
+}
+```
+36.  
